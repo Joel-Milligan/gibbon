@@ -1,4 +1,4 @@
-use crate::token::{self, Token};
+use crate::token::{lookup_ident, Kind, Token};
 
 pub struct Lexer {
     input: String,
@@ -20,17 +20,27 @@ impl Lexer {
     }
 
     pub fn next(&mut self) -> Token {
+        self.skip_whitespace();
+
         let tok = match self.ch {
-            '=' => Token::new(token::Kind::Assign, self.ch.to_string()),
-            '+' => Token::new(token::Kind::Plus, self.ch.to_string()),
-            ';' => Token::new(token::Kind::SemiColon, self.ch.to_string()),
-            ',' => Token::new(token::Kind::Comma, self.ch.to_string()),
-            '(' => Token::new(token::Kind::LParen, self.ch.to_string()),
-            ')' => Token::new(token::Kind::RParen, self.ch.to_string()),
-            '{' => Token::new(token::Kind::LBrace, self.ch.to_string()),
-            '}' => Token::new(token::Kind::RBrace, self.ch.to_string()),
-            '\0' => Token::new(token::Kind::Eof, "".to_string()),
-            _ => Token::new(token::Kind::Illegal, "".to_string()),
+            '=' => Token::new(Kind::Assign, self.ch.to_string()),
+            '+' => Token::new(Kind::Plus, self.ch.to_string()),
+            ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
+            ',' => Token::new(Kind::Comma, self.ch.to_string()),
+            '(' => Token::new(Kind::LParen, self.ch.to_string()),
+            ')' => Token::new(Kind::RParen, self.ch.to_string()),
+            '{' => Token::new(Kind::LBrace, self.ch.to_string()),
+            '}' => Token::new(Kind::RBrace, self.ch.to_string()),
+            '\0' => Token::new(Kind::Eof, "".to_string()),
+            c => {
+                if identifier_character(&c) {
+                    let literal = self.read_identifier();
+                    let ident = lookup_ident(&literal);
+                    Token::new(ident, literal)
+                } else {
+                    Token::new(Kind::Illegal, "".to_string())
+                }
+            }
         };
 
         self.read_char();
@@ -38,31 +48,115 @@ impl Lexer {
         return tok;
     }
 
+    fn skip_whitespace(&mut self) {
+        while self.ch.is_whitespace() {
+            self.read_char();
+        }
+    }
+
     fn read_char(&mut self) {
         self.ch = self.input.chars().nth(self.read_position).unwrap_or('\0');
         self.position = self.read_position;
         self.read_position += 1;
     }
+
+    fn read_identifier(&mut self) -> String {
+        let position = self.position;
+        while identifier_character(&self.ch) {
+            self.read_char();
+        }
+        return self.input[position..self.position].to_string();
+    }
+}
+
+fn identifier_character(c: &char) -> bool {
+    c.is_alphabetic() || c == &'_'
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{lexer::Lexer, token};
+    use crate::lexer::Lexer;
+    use crate::token::Kind;
 
     #[test]
-    fn next_token() {
+    fn single_chars() {
         // Arrange
         let input = "=+(){},;".to_string();
         let cases = vec![
-            (token::Kind::Assign, "="),
-            (token::Kind::Plus, "+"),
-            (token::Kind::LParen, "("),
-            (token::Kind::RParen, ")"),
-            (token::Kind::LBrace, "{"),
-            (token::Kind::RBrace, "}"),
-            (token::Kind::Comma, ","),
-            (token::Kind::SemiColon, ";"),
-            (token::Kind::Eof, ""),
+            (Kind::Assign, "="),
+            (Kind::Plus, "+"),
+            (Kind::LParen, "("),
+            (Kind::RParen, ")"),
+            (Kind::LBrace, "{"),
+            (Kind::RBrace, "}"),
+            (Kind::Comma, ","),
+            (Kind::SemiColon, ";"),
+            (Kind::Eof, ""),
+        ];
+
+        // Act
+        let mut lexer = Lexer::new(input);
+
+        // Assert
+        for case in cases {
+            let token = lexer.next();
+            assert_eq!(token.kind, case.0);
+            assert_eq!(token.literal, case.1);
+        }
+    }
+
+    #[test]
+    fn simple_code_snippet() {
+        // Arrange
+        let input = r#"
+            let five = 5;
+            let ten = 10;
+
+            let add = fn(x, y) {
+                x + y;
+            };
+
+            let result = add(five, ten);"#
+            .to_string();
+
+        let cases = vec![
+            (Kind::Let, "let"),
+            (Kind::Ident, "five"),
+            (Kind::Assign, "="),
+            (Kind::Int, "5"),
+            (Kind::SemiColon, ";"),
+            (Kind::Let, "let"),
+            (Kind::Ident, "ten"),
+            (Kind::Assign, "="),
+            (Kind::Int, "10"),
+            (Kind::SemiColon, ";"),
+            (Kind::Let, "let"),
+            (Kind::Ident, "add"),
+            (Kind::Assign, "="),
+            (Kind::Function, "fn"),
+            (Kind::LParen, "("),
+            (Kind::Ident, "x"),
+            (Kind::Comma, ","),
+            (Kind::Ident, "y"),
+            (Kind::RParen, ")"),
+            (Kind::LBrace, "{"),
+            (Kind::Ident, "x"),
+            (Kind::Plus, "+"),
+            (Kind::Ident, "y"),
+            (Kind::SemiColon, ";"),
+            (Kind::RBrace, "}"),
+            (Kind::SemiColon, ";"),
+            (Kind::Let, "let"),
+            (Kind::Ident, "result"),
+            (Kind::Assign, "="),
+            (Kind::Ident, "add"),
+            (Kind::LParen, "("),
+            (Kind::Ident, "five"),
+            (Kind::Comma, ","),
+            (Kind::Ident, "ten"),
+            (Kind::RParen, ")"),
+            (Kind::SemiColon, ";"),
+            (Kind::Eof, ""),
         ];
 
         // Act
