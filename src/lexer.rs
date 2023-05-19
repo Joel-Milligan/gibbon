@@ -22,7 +22,7 @@ impl Lexer {
     pub fn next(&mut self) -> Token {
         self.skip_whitespace();
 
-        let tok = match self.ch {
+        let token = match self.ch {
             '=' => Token::new(Kind::Assign, self.ch.to_string()),
             '+' => Token::new(Kind::Plus, self.ch.to_string()),
             ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
@@ -36,16 +36,18 @@ impl Lexer {
                 if identifier_character(&c) {
                     let literal = self.read_identifier();
                     let ident = lookup_ident(&literal);
-                    Token::new(ident, literal)
+                    return Token::new(ident, literal);
+                } else if c.is_ascii_digit() {
+                    return Token::new(Kind::Int, self.read_number());
                 } else {
-                    Token::new(Kind::Illegal, "".to_string())
+                    return Token::new(Kind::Illegal, "".to_string());
                 }
             }
         };
 
         self.read_char();
 
-        return tok;
+        token
     }
 
     fn skip_whitespace(&mut self) {
@@ -65,12 +67,20 @@ impl Lexer {
         while identifier_character(&self.ch) {
             self.read_char();
         }
-        return self.input[position..self.position].to_string();
+        self.input[position..self.position].to_string()
+    }
+
+    fn read_number(&mut self) -> String {
+        let position = self.position;
+        while self.ch.is_ascii_digit() {
+            self.read_char();
+        }
+        self.input[position..self.position].to_string()
     }
 }
 
 fn identifier_character(c: &char) -> bool {
-    c.is_alphabetic() || c == &'_'
+    c.is_ascii_alphabetic() || c == &'_'
 }
 
 #[cfg(test)]
@@ -81,16 +91,16 @@ mod tests {
     #[test]
     fn single_chars() {
         // Arrange
-        let input = "=+(){},;".to_string();
+        let input = "=;+(){},".to_string();
         let cases = vec![
             (Kind::Assign, "="),
+            (Kind::SemiColon, ";"),
             (Kind::Plus, "+"),
             (Kind::LParen, "("),
             (Kind::RParen, ")"),
             (Kind::LBrace, "{"),
             (Kind::RBrace, "}"),
             (Kind::Comma, ","),
-            (Kind::SemiColon, ";"),
             (Kind::Eof, ""),
         ];
 
