@@ -19,6 +19,57 @@ impl Lexer {
         lexer
     }
 
+    pub fn next_token(&mut self) -> Token {
+        self.skip_whitespace();
+
+        let token = match self.ch {
+            '=' => {
+                if self.peek_char() == Some('=') {
+                    self.read_char();
+                    Token::new(Kind::Eq, "==".to_string())
+                } else {
+                    Token::new(Kind::Assign, self.ch.to_string())
+                }
+            }
+            '+' => Token::new(Kind::Plus, self.ch.to_string()),
+            '-' => Token::new(Kind::Minus, self.ch.to_string()),
+            '*' => Token::new(Kind::Asterix, self.ch.to_string()),
+            '/' => Token::new(Kind::Slash, self.ch.to_string()),
+            '!' => {
+                if self.peek_char() == Some('=') {
+                    self.read_char();
+                    Token::new(Kind::Ne, "!=".to_string())
+                } else {
+                    Token::new(Kind::Bang, self.ch.to_string())
+                }
+            }
+            '<' => Token::new(Kind::Lt, self.ch.to_string()),
+            '>' => Token::new(Kind::Gt, self.ch.to_string()),
+            ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
+            ',' => Token::new(Kind::Comma, self.ch.to_string()),
+            '(' => Token::new(Kind::LParen, self.ch.to_string()),
+            ')' => Token::new(Kind::RParen, self.ch.to_string()),
+            '{' => Token::new(Kind::LBrace, self.ch.to_string()),
+            '}' => Token::new(Kind::RBrace, self.ch.to_string()),
+            '\0' => Token::new(Kind::Eof, "".to_string()),
+            c => {
+                if identifier_character(&c) {
+                    let literal = self.read_identifier();
+                    let ident = lookup_ident(&literal);
+                    return Token::new(ident, literal);
+                } else if c.is_ascii_digit() {
+                    return Token::new(Kind::Int, self.read_number());
+                } else {
+                    return Token::new(Kind::Illegal, "".to_string());
+                }
+            }
+        };
+
+        self.read_char();
+
+        token
+    }
+
     fn skip_whitespace(&mut self) {
         while self.ch.is_whitespace() {
             self.read_char();
@@ -52,61 +103,6 @@ impl Lexer {
     }
 }
 
-impl Iterator for Lexer {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.skip_whitespace();
-
-        let token = match self.ch {
-            '=' => {
-                if self.peek_char() == Some('=') {
-                    self.read_char();
-                    Token::new(Kind::Eq, "==".to_string())
-                } else {
-                    Token::new(Kind::Assign, self.ch.to_string())
-                }
-            }
-            '+' => Token::new(Kind::Plus, self.ch.to_string()),
-            '-' => Token::new(Kind::Minus, self.ch.to_string()),
-            '*' => Token::new(Kind::Asterix, self.ch.to_string()),
-            '/' => Token::new(Kind::Slash, self.ch.to_string()),
-            '!' => {
-                if self.peek_char() == Some('=') {
-                    self.read_char();
-                    Token::new(Kind::Ne, "!=".to_string())
-                } else {
-                    Token::new(Kind::Bang, self.ch.to_string())
-                }
-            }
-            '<' => Token::new(Kind::Lt, self.ch.to_string()),
-            '>' => Token::new(Kind::Gt, self.ch.to_string()),
-            ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
-            ',' => Token::new(Kind::Comma, self.ch.to_string()),
-            '(' => Token::new(Kind::LParen, self.ch.to_string()),
-            ')' => Token::new(Kind::RParen, self.ch.to_string()),
-            '{' => Token::new(Kind::LBrace, self.ch.to_string()),
-            '}' => Token::new(Kind::RBrace, self.ch.to_string()),
-            '\0' => return None,
-            c => {
-                if identifier_character(&c) {
-                    let literal = self.read_identifier();
-                    let ident = lookup_ident(&literal);
-                    return Some(Token::new(ident, literal));
-                } else if c.is_ascii_digit() {
-                    return Some(Token::new(Kind::Int, self.read_number()));
-                } else {
-                    return Some(Token::new(Kind::Illegal, "".to_string()));
-                }
-            }
-        };
-
-        self.read_char();
-
-        Some(token)
-    }
-}
-
 fn identifier_character(c: &char) -> bool {
     c.is_ascii_alphabetic() || c == &'_'
 }
@@ -129,6 +125,7 @@ mod tests {
             (Kind::LBrace, "{"),
             (Kind::RBrace, "}"),
             (Kind::Comma, ","),
+            (Kind::Eof, ""),
         ];
 
         // Act
@@ -136,11 +133,10 @@ mod tests {
 
         // Assert
         for case in cases {
-            let token = lexer.next().unwrap();
+            let token = lexer.next_token();
             assert_eq!(token.kind, case.0);
             assert_eq!(token.literal, case.1);
         }
-        assert_eq!(lexer.next(), None);
     }
 
     #[test]
@@ -242,6 +238,7 @@ mod tests {
             (Kind::Ne, "!="),
             (Kind::Int, "9"),
             (Kind::SemiColon, ";"),
+            (Kind::Eof, ""),
         ];
 
         // Act
@@ -249,10 +246,9 @@ mod tests {
 
         // Assert
         for case in cases {
-            let token = lexer.next().unwrap();
+            let token = lexer.next_token();
             assert_eq!(token.kind, case.0);
             assert_eq!(token.literal, case.1);
         }
-        assert_eq!(lexer.next(), None);
     }
 }

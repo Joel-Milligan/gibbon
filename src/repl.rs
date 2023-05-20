@@ -1,6 +1,6 @@
 use std::io::{self, Stdin, Stdout, Write};
 
-use crate::lexer::Lexer;
+use crate::{lexer::Lexer, token::Kind};
 
 static PROMPT: &'static str = ">> ";
 
@@ -16,10 +16,12 @@ pub fn start(stdin: &mut Stdin, stdout: &mut Stdout) {
             .read_line(&mut input_buffer)
             .expect("Could not read from stdin");
 
-        let lexer = Lexer::new(input_buffer.clone());
+        let mut lexer = Lexer::new(input_buffer.clone());
+        let mut token = lexer.next_token();
 
-        for token in lexer {
+        while token.kind != Kind::Eof {
             writeln!(stdout, "{token:?}").expect("Could not write to stdout");
+            token = lexer.next_token();
         }
     }
 }
