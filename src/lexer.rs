@@ -129,7 +129,6 @@ mod tests {
             (Kind::LBrace, "{"),
             (Kind::RBrace, "}"),
             (Kind::Comma, ","),
-            (Kind::Eof, ""),
         ];
 
         // Act
@@ -141,6 +140,7 @@ mod tests {
             assert_eq!(token.kind, case.0);
             assert_eq!(token.literal, case.1);
         }
+        assert_eq!(lexer.next(), None);
     }
 
     #[test]
@@ -242,7 +242,6 @@ mod tests {
             (Kind::Ne, "!="),
             (Kind::Int, "9"),
             (Kind::SemiColon, ";"),
-            (Kind::Eof, ""),
         ];
 
         // Act
@@ -254,5 +253,6 @@ mod tests {
             assert_eq!(token.kind, case.0);
             assert_eq!(token.literal, case.1);
         }
+        assert_eq!(lexer.next(), None);
     }
 }

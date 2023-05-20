@@ -51,7 +51,7 @@ static KEYWORDS: phf::Map<&'static str, Kind> = phf_map! {
     "return" => Kind::Return,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Token {
     pub kind: Kind,
     pub literal: String,
