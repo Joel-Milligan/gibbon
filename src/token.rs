@@ -19,6 +19,8 @@ pub enum Kind {
     Bang,
     Lt,
     Gt,
+    Eq,
+    Ne,
 
     // Delimiters
     Comma,

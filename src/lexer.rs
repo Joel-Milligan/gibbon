@@ -23,12 +23,26 @@ impl Lexer {
         self.skip_whitespace();
 
         let token = match self.ch {
-            '=' => Token::new(Kind::Assign, self.ch.to_string()),
+            '=' => {
+                if self.peek_char() == Some('=') {
+                    self.read_char();
+                    Token::new(Kind::Eq, "==".to_string())
+                } else {
+                    Token::new(Kind::Assign, self.ch.to_string())
+                }
+            }
             '+' => Token::new(Kind::Plus, self.ch.to_string()),
             '-' => Token::new(Kind::Minus, self.ch.to_string()),
             '*' => Token::new(Kind::Asterix, self.ch.to_string()),
             '/' => Token::new(Kind::Slash, self.ch.to_string()),
-            '!' => Token::new(Kind::Bang, self.ch.to_string()),
+            '!' => {
+                if self.peek_char() == Some('=') {
+                    self.read_char();
+                    Token::new(Kind::Ne, "!=".to_string())
+                } else {
+                    Token::new(Kind::Bang, self.ch.to_string())
+                }
+            }
             '<' => Token::new(Kind::Lt, self.ch.to_string()),
             '>' => Token::new(Kind::Gt, self.ch.to_string()),
             ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
@@ -82,6 +96,10 @@ impl Lexer {
             self.read_char();
         }
         self.input[position..self.position].to_string()
+    }
+
+    fn peek_char(&mut self) -> Option<char> {
+        self.input.chars().nth(self.read_position)
     }
 }
 
@@ -140,8 +158,11 @@ mod tests {
                 return true;
             } else {
                 return false;
-            }"#
-        .to_string();
+            }
+            
+            10 == 10;
+            10 != 9;"#
+            .to_string();
 
         let cases = vec![
             (Kind::Let, "let"),
@@ -209,6 +230,14 @@ mod tests {
             (Kind::False, "false"),
             (Kind::SemiColon, ";"),
             (Kind::RBrace, "}"),
+            (Kind::Int, "10"),
+            (Kind::Eq, "=="),
+            (Kind::Int, "10"),
+            (Kind::SemiColon, ";"),
+            (Kind::Int, "10"),
+            (Kind::Ne, "!="),
+            (Kind::Int, "9"),
+            (Kind::SemiColon, ";"),
             (Kind::Eof, ""),
         ];
 
