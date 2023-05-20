@@ -12,6 +12,13 @@ pub enum Kind {
     // Operators
     Assign,
     Plus,
+    Minus,
+    Asterix,
+    Slash,
+
+    Bang,
+    Lt,
+    Gt,
 
     // Delimiters
     Comma,
@@ -25,11 +32,21 @@ pub enum Kind {
     // Keywords
     Function,
     Let,
+    True,
+    False,
+    If,
+    Else,
+    Return,
 }
 
 static KEYWORDS: phf::Map<&'static str, Kind> = phf_map! {
     "fn" => Kind::Function,
     "let" => Kind::Let,
+    "true" => Kind::True,
+    "false" => Kind::False,
+    "if" => Kind::If,
+    "else" => Kind::Else,
+    "return" => Kind::Return,
 };
 
 pub struct Token {

@@ -25,6 +25,12 @@ impl Lexer {
         let token = match self.ch {
             '=' => Token::new(Kind::Assign, self.ch.to_string()),
             '+' => Token::new(Kind::Plus, self.ch.to_string()),
+            '-' => Token::new(Kind::Minus, self.ch.to_string()),
+            '*' => Token::new(Kind::Asterix, self.ch.to_string()),
+            '/' => Token::new(Kind::Slash, self.ch.to_string()),
+            '!' => Token::new(Kind::Bang, self.ch.to_string()),
+            '<' => Token::new(Kind::Lt, self.ch.to_string()),
+            '>' => Token::new(Kind::Gt, self.ch.to_string()),
             ';' => Token::new(Kind::SemiColon, self.ch.to_string()),
             ',' => Token::new(Kind::Comma, self.ch.to_string()),
             '(' => Token::new(Kind::LParen, self.ch.to_string()),
@@ -126,8 +132,16 @@ mod tests {
                 x + y;
             };
 
-            let result = add(five, ten);"#
-            .to_string();
+            let result = add(five, ten);
+            !-/*5;
+            5 < 10 > 5;
+            
+            if (5 < 10) {
+                return true;
+            } else {
+                return false;
+            }"#
+        .to_string();
 
         let cases = vec![
             (Kind::Let, "let"),
@@ -166,6 +180,35 @@ mod tests {
             (Kind::Ident, "ten"),
             (Kind::RParen, ")"),
             (Kind::SemiColon, ";"),
+            (Kind::Bang, "!"),
+            (Kind::Minus, "-"),
+            (Kind::Slash, "/"),
+            (Kind::Asterix, "*"),
+            (Kind::Int, "5"),
+            (Kind::SemiColon, ";"),
+            (Kind::Int, "5"),
+            (Kind::Lt, "<"),
+            (Kind::Int, "10"),
+            (Kind::Gt, ">"),
+            (Kind::Int, "5"),
+            (Kind::SemiColon, ";"),
+            (Kind::If, "if"),
+            (Kind::LParen, "("),
+            (Kind::Int, "5"),
+            (Kind::Lt, "<"),
+            (Kind::Int, "10"),
+            (Kind::RParen, ")"),
+            (Kind::LBrace, "{"),
+            (Kind::Return, "return"),
+            (Kind::True, "true"),
+            (Kind::SemiColon, ";"),
+            (Kind::RBrace, "}"),
+            (Kind::Else, "else"),
+            (Kind::LBrace, "{"),
+            (Kind::Return, "return"),
+            (Kind::False, "false"),
+            (Kind::SemiColon, ";"),
+            (Kind::RBrace, "}"),
             (Kind::Eof, ""),
         ];
 
