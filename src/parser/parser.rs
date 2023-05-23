@@ -1,6 +1,8 @@
-use crate::ast::{Expression, Identifer, Program, Statement};
 use crate::lexer::Lexer;
+use crate::parser::ast::{Expression, Identifer};
 use crate::token::{Kind, Token};
+
+use super::ast::{Program, Statement};
 
 struct Parser {
     lexer: Lexer,
@@ -58,9 +60,7 @@ impl Parser {
                     self.next_token();
                 }
 
-                Some(Statement::Return {
-                    value: Expression::Temporary,
-                })
+                Some(Statement::Return(Expression::Temporary))
             }
             _ => None,
         }
@@ -106,9 +106,10 @@ impl Parser {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{Node, Statement};
     use crate::lexer::Lexer;
-    use crate::parser::Parser;
+    use crate::parser::ast::{Node, Statement};
+
+    use super::Parser;
 
     fn valid_let_statement(statement: &Statement, let_name: &str) -> bool {
         if statement.token_literal() != "let" {
