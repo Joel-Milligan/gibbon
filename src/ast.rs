@@ -6,21 +6,15 @@ pub trait Node {
 
 #[derive(Debug)]
 pub enum Statement {
-    Let {
-        token: Token,
-        name: Identifer,
-        value: Expression,
-    },
+    Let { name: Identifer, value: Expression },
+    Return { value: Expression },
 }
 
 impl Node for Statement {
     fn token_literal(&self) -> String {
         match self {
-            Self::Let {
-                token: _,
-                name: _,
-                value: _,
-            } => "let".to_string(),
+            Self::Let { .. } => "let".to_string(),
+            Self::Return { .. } => "return".to_string(),
         }
     }
 }

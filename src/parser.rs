@@ -49,8 +49,16 @@ impl Parser {
                 }
 
                 Some(Statement::Let {
-                    token: self.current_token.clone(),
                     name,
+                    value: Expression::Temporary,
+                })
+            }
+            Kind::Return => {
+                while self.current_token.kind != Kind::SemiColon {
+                    self.next_token();
+                }
+
+                Some(Statement::Return {
                     value: Expression::Temporary,
                 })
             }
@@ -108,11 +116,10 @@ mod tests {
         }
 
         match statement {
-            Statement::Let {
-                token: _,
-                name,
-                value: _,
-            } => name.value == let_name && name.token_literal() == let_name,
+            Statement::Let { name, .. } => {
+                name.value == let_name && name.token_literal() == let_name
+            }
+            _ => false,
         }
     }
 
@@ -150,6 +157,32 @@ mod tests {
         for (i, t) in tests.iter().enumerate() {
             let statement = &program.statements[i];
             assert!(valid_let_statement(statement, t));
+        }
+    }
+
+    #[test]
+    fn return_statement() {
+        // Arrange
+        let input = r#"
+            return 5; 
+            return 10; 
+            return 838383;
+        "#
+        .to_string();
+
+        let tests = vec!["x", "y", "foobar"];
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 3);
+        for i in 0..tests.len() {
+            let statement = &program.statements[i];
+            assert_eq!(statement.token_literal(), "return");
         }
     }
 }
