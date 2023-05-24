@@ -1,6 +1,7 @@
 use std::io::{self, Stdin, Stdout, Write};
 
-use crate::{lexer::Lexer, token::Kind};
+use crate::lexer::Lexer;
+use crate::token::Kind;
 
 static PROMPT: &'static str = ">> ";
 
