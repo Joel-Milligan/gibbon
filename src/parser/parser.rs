@@ -32,8 +32,7 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
-        let prefix = self.parse_prefix_expression();
-        Some(prefix)
+        self.parse_prefix_expression()
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
@@ -101,15 +100,30 @@ impl Parser {
         program
     }
 
-    fn parse_identifier(&self) -> Expression {
-        Expression::Identifier {
+    fn parse_identifier(&self) -> Option<Expression> {
+        Some(Expression::Identifier {
             token: self.current_token.clone(),
             value: self.current_token.literal.clone(),
+        })
+    }
+
+    fn parse_integer_literal(&mut self) -> Option<Expression> {
+        if let Ok(value) = self.current_token.literal.parse::<i64>() {
+            Some(Expression::IntegerLiteral {
+                token: self.current_token.clone(),
+                value,
+            })
+        } else {
+            let err = format!("could not parse {} as integer", self.current_token.literal);
+            self.errors.push(err);
+            return None;
         }
     }
-    fn parse_prefix_expression(&mut self) -> Expression {
+
+    fn parse_prefix_expression(&mut self) -> Option<Expression> {
         match &self.current_token.kind {
             Kind::Ident => self.parse_identifier(),
+            Kind::Int => self.parse_integer_literal(),
             _ => unimplemented!(),
         }
     }
@@ -243,6 +257,36 @@ mod tests {
             Expression::Identifier { token, value } => {
                 assert_eq!(token.literal, "foobar");
                 assert_eq!(value, "foobar");
+            }
+            e => panic!("{e} is not an identifier"),
+        };
+    }
+
+    #[test]
+    fn literal_expression() {
+        // Arrange
+        let input = "5;".to_string();
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 1);
+        let expression_statement = match &program.statements[0] {
+            Statement::Expression {
+                token: _,
+                expression,
+            } => expression,
+            s => panic!("{s} is not an expression statement"),
+        };
+
+        match expression_statement {
+            Expression::IntegerLiteral { token, value } => {
+                assert_eq!(token.literal, "5");
+                assert_eq!(*value, 5);
             }
             e => panic!("{e} is not an identifier"),
         };

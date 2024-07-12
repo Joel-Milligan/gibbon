@@ -8,6 +8,7 @@ use super::Node;
 pub enum Expression {
     Temporary,
     Identifier { token: Token, value: String },
+    IntegerLiteral { token: Token, value: i64 },
 }
 
 impl Node for Expression {
