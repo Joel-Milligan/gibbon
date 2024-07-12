@@ -1,12 +1,20 @@
 use std::fmt::Display;
 
+use crate::token::Token;
+
 use super::{Expression, Identifer, Node};
 
 #[derive(Debug)]
 pub enum Statement {
-    Let { name: Identifer, value: Expression },
+    Let {
+        name: Identifer,
+        value: Expression,
+    },
     Return(Expression),
-    Expression(Expression),
+    Expression {
+        token: Token,
+        expression: Expression,
+    },
 }
 
 impl Node for Statement {
@@ -14,7 +22,10 @@ impl Node for Statement {
         match self {
             Self::Let { .. } => "let".to_string(),
             Self::Return(_) => "return".to_string(),
-            Self::Expression(_) => todo!(),
+            Self::Expression {
+                token,
+                expression: _,
+            } => token.literal.to_string(),
         }
     }
 }
@@ -26,7 +37,10 @@ impl Display for Statement {
                 writeln!(f, "let {} = {};", name, value)
             }
             Statement::Return(value) => writeln!(f, "return {value};"),
-            Statement::Expression(value) => writeln!(f, "{value}"),
+            Statement::Expression {
+                token: _,
+                expression,
+            } => writeln!(f, "{expression}"),
         }
     }
 }

@@ -1,10 +1,13 @@
 use std::fmt::Display;
 
+use crate::token::Token;
+
 use super::Node;
 
 #[derive(Debug)]
 pub enum Expression {
     Temporary,
+    Identifier { token: Token, value: String },
 }
 
 impl Node for Expression {

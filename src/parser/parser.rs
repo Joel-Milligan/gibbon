@@ -4,11 +4,13 @@ use crate::token::{Kind, Token};
 
 use super::ast::{Program, Statement};
 
+const LOWEST: i32 = 0;
+
 struct Parser {
     lexer: Lexer,
+    errors: Vec<String>,
     current_token: Token,
     peek_token: Token,
-    errors: Vec<String>,
 }
 
 impl Parser {
@@ -18,15 +20,20 @@ impl Parser {
 
         Parser {
             lexer,
+            errors: vec![],
             current_token,
             peek_token,
-            errors: vec![],
         }
     }
 
     fn next_token(&mut self) {
         self.current_token = self.peek_token.clone();
         self.peek_token = self.lexer.next_token();
+    }
+
+    fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
+        let prefix = self.parse_prefix_expression();
+        Some(prefix)
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
@@ -62,7 +69,18 @@ impl Parser {
 
                 Some(Statement::Return(Expression::Temporary))
             }
-            _ => None,
+            _ => {
+                let statement = Statement::Expression {
+                    token: self.current_token.clone(),
+                    expression: self.parse_expression(LOWEST).unwrap(),
+                };
+
+                if self.peek_token.kind == Kind::SemiColon {
+                    self.next_token();
+                }
+
+                Some(statement)
+            }
         }
     }
 
@@ -81,6 +99,19 @@ impl Parser {
         }
 
         program
+    }
+
+    fn parse_identifier(&self) -> Expression {
+        Expression::Identifier {
+            token: self.current_token.clone(),
+            value: self.current_token.literal.clone(),
+        }
+    }
+    fn parse_prefix_expression(&mut self) -> Expression {
+        match &self.current_token.kind {
+            Kind::Ident => self.parse_identifier(),
+            _ => unimplemented!(),
+        }
     }
 
     fn peek_error(&mut self, token_kind: Kind) {
@@ -107,7 +138,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use crate::lexer::Lexer;
-    use crate::parser::ast::{Node, Statement};
+    use crate::parser::ast::{Expression, Node, Statement};
 
     use super::Parser;
 
@@ -185,5 +216,35 @@ mod tests {
             let statement = &program.statements[i];
             assert_eq!(statement.token_literal(), "return");
         }
+    }
+
+    #[test]
+    fn identifier_expression() {
+        // Arrange
+        let input = "foobar;".to_string();
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 1);
+        let expression_statement = match &program.statements[0] {
+            Statement::Expression {
+                token: _,
+                expression,
+            } => expression,
+            s => panic!("{s} is not an expression statement"),
+        };
+
+        match expression_statement {
+            Expression::Identifier { token, value } => {
+                assert_eq!(token.literal, "foobar");
+                assert_eq!(value, "foobar");
+            }
+            e => panic!("{e} is not an identifier"),
+        };
     }
 }
