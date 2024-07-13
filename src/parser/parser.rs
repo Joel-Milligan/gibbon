@@ -5,6 +5,7 @@ use crate::token::{Kind, Token};
 use super::ast::{Program, Statement};
 
 const LOWEST: i32 = 0;
+const PREFIX: i32 = 1;
 
 struct Parser {
     lexer: Lexer,
@@ -32,7 +33,12 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
-        self.parse_prefix_expression()
+        match &self.current_token.kind {
+            Kind::Ident => self.parse_identifier(),
+            Kind::Int => self.parse_integer_literal(),
+            Kind::Bang | Kind::Minus => self.parse_prefix(),
+            _ => None,
+        }
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
@@ -69,16 +75,20 @@ impl Parser {
                 Some(Statement::Return(Expression::Temporary))
             }
             _ => {
-                let statement = Statement::Expression {
-                    token: self.current_token.clone(),
-                    expression: self.parse_expression(LOWEST).unwrap(),
-                };
+                if let Some(expression) = self.parse_expression(LOWEST) {
+                    let statement = Statement::Expression {
+                        token: self.current_token.clone(),
+                        expression,
+                    };
 
-                if self.peek_token.kind == Kind::SemiColon {
-                    self.next_token();
+                    if self.peek_token.kind == Kind::SemiColon {
+                        self.next_token();
+                    }
+
+                    Some(statement)
+                } else {
+                    None
                 }
-
-                Some(statement)
             }
         }
     }
@@ -101,18 +111,12 @@ impl Parser {
     }
 
     fn parse_identifier(&self) -> Option<Expression> {
-        Some(Expression::Identifier {
-            token: self.current_token.clone(),
-            value: self.current_token.literal.clone(),
-        })
+        Some(Expression::Identifier(self.current_token.literal.clone()))
     }
 
     fn parse_integer_literal(&mut self) -> Option<Expression> {
         if let Ok(value) = self.current_token.literal.parse::<i64>() {
-            Some(Expression::IntegerLiteral {
-                token: self.current_token.clone(),
-                value,
-            })
+            Some(Expression::IntegerLiteral(value))
         } else {
             let err = format!("could not parse {} as integer", self.current_token.literal);
             self.errors.push(err);
@@ -120,12 +124,15 @@ impl Parser {
         }
     }
 
-    fn parse_prefix_expression(&mut self) -> Option<Expression> {
-        match &self.current_token.kind {
-            Kind::Ident => self.parse_identifier(),
-            Kind::Int => self.parse_integer_literal(),
-            _ => unimplemented!(),
-        }
+    fn parse_prefix(&mut self) -> Option<Expression> {
+        let operator = self.current_token.literal.clone();
+        self.next_token();
+        let expression = Expression::Prefix {
+            operator,
+            right: Box::new(self.parse_expression(PREFIX).unwrap()),
+        };
+
+        Some(expression)
     }
 
     fn peek_error(&mut self, token_kind: Kind) {
@@ -254,8 +261,8 @@ mod tests {
         };
 
         match expression_statement {
-            Expression::Identifier { token, value } => {
-                assert_eq!(token.literal, "foobar");
+            Expression::Identifier(value) => {
+                assert_eq!(expression_statement.token_literal(), "foobar");
                 assert_eq!(value, "foobar");
             }
             e => panic!("{e} is not an identifier"),
@@ -284,11 +291,46 @@ mod tests {
         };
 
         match expression_statement {
-            Expression::IntegerLiteral { token, value } => {
-                assert_eq!(token.literal, "5");
+            Expression::IntegerLiteral(value) => {
+                assert_eq!(expression_statement.token_literal(), "5");
                 assert_eq!(*value, 5);
             }
             e => panic!("{e} is not an identifier"),
         };
+    }
+
+    #[test]
+    fn prefix_expression() {
+        // Arrange
+        let prefix_tests = vec![("!5;", "!", 5i64), ("-15;", "-", 15i64)];
+
+        // Act
+        for (input, op, integer_value) in prefix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.statements.len(), 1);
+            let expression_statement = match &program.statements[0] {
+                Statement::Expression {
+                    token: _,
+                    expression,
+                } => expression,
+                s => panic!("{s} is not an expression statement"),
+            };
+
+            match expression_statement {
+                Expression::Prefix { operator, right } => {
+                    assert_eq!(operator, op);
+                    match **right {
+                        Expression::IntegerLiteral(i) => assert_eq!(i, integer_value),
+                        _ => panic!("is not an integer literal"),
+                    }
+                }
+                e => panic!("{e} is not an identifier"),
+            };
+        }
     }
 }
