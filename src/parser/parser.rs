@@ -6,6 +6,10 @@ use super::ast::{Program, Statement};
 
 const LOWEST: i32 = 0;
 const PREFIX: i32 = 1;
+const EQUALITY: i32 = 2;
+const LESS_GREATER: i32 = 3;
+const SUM: i32 = 4;
+const PRODUCT: i32 = 5;
 
 struct Parser {
     lexer: Lexer,
@@ -33,16 +37,34 @@ impl Parser {
     }
 
     fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
-        match &self.current_token.kind {
+        let mut left = match &self.current_token.kind {
             Kind::Ident => self.parse_identifier(),
             Kind::Int => self.parse_integer_literal(),
             Kind::Bang | Kind::Minus => self.parse_prefix(),
             _ => None,
+        };
+
+        while self.peek_token.kind != Kind::SemiColon && precendence < self.peek_precedence() {
+            left = match &self.peek_token.kind {
+                Kind::Plus
+                | Kind::Minus
+                | Kind::Asterix
+                | Kind::Slash
+                | Kind::Eq
+                | Kind::Ne
+                | Kind::Gt
+                | Kind::Lt => {
+                    self.next_token();
+                    self.parse_infix(left.unwrap())
+                }
+                _ => return left,
+            }
         }
+
+        left
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
-        println!("START STATEMENT: {:?}", self.current_token);
         match &self.current_token.kind {
             Kind::Let => {
                 if !self.expect_peek(Kind::Ident) {
@@ -96,11 +118,8 @@ impl Parser {
     fn parse_program(&mut self) -> Program {
         let mut program = Program { statements: vec![] };
 
-        println!("START PROGRAM: {:?}", self.current_token);
-
         while self.current_token.kind != Kind::Eof {
             let statement = self.parse_statement();
-            println!("STATEMENT: {statement:?}");
             if let Some(s) = statement {
                 program.statements.push(s);
             }
@@ -135,6 +154,42 @@ impl Parser {
         Some(expression)
     }
 
+    fn parse_infix(&mut self, left: Expression) -> Option<Expression> {
+        let operator = self.current_token.literal.clone();
+
+        let precedence = self.current_precedence();
+        self.next_token();
+        let right = self.parse_expression(precedence);
+
+        let expression = Expression::Infix {
+            left: Box::new(left),
+            operator,
+            right: Box::new(right.unwrap()),
+        };
+
+        Some(expression)
+    }
+
+    fn peek_precedence(&self) -> i32 {
+        match self.peek_token.kind {
+            Kind::Eq | Kind::Ne => EQUALITY,
+            Kind::Lt | Kind::Gt => LESS_GREATER,
+            Kind::Plus | Kind::Minus => SUM,
+            Kind::Asterix | Kind::Slash => PRODUCT,
+            _ => LOWEST,
+        }
+    }
+
+    fn current_precedence(&self) -> i32 {
+        match self.current_token.kind {
+            Kind::Eq | Kind::Ne => EQUALITY,
+            Kind::Lt | Kind::Gt => LESS_GREATER,
+            Kind::Plus | Kind::Minus => SUM,
+            Kind::Asterix | Kind::Slash => PRODUCT,
+            _ => LOWEST,
+        }
+    }
+
     fn peek_error(&mut self, token_kind: Kind) {
         self.errors.push(format!(
             "expected next token to be {token_kind:?}, got {:?} instead",
@@ -143,13 +198,10 @@ impl Parser {
     }
 
     fn expect_peek(&mut self, expected_token: Kind) -> bool {
-        println!("PEEK: {:?}", self.peek_token);
         if expected_token == self.peek_token.kind {
-            println!("TOKEN SUCCESS: {expected_token:?}");
             self.next_token();
             return true;
         } else {
-            println!("TOKEN FAIL: {expected_token:?}");
             self.peek_error(expected_token);
             return false;
         }
@@ -324,12 +376,64 @@ mod tests {
             match expression_statement {
                 Expression::Prefix { operator, right } => {
                     assert_eq!(operator, op);
-                    match **right {
-                        Expression::IntegerLiteral(i) => assert_eq!(i, integer_value),
-                        _ => panic!("is not an integer literal"),
+                    match &**right {
+                        Expression::IntegerLiteral(i) => assert_eq!(*i, integer_value),
+                        e => panic!("{e} is not an integer literal"),
                     }
                 }
-                e => panic!("{e} is not an identifier"),
+                e => panic!("{e} is not a prefix expression"),
+            };
+        }
+    }
+
+    #[test]
+    fn infix_expression() {
+        // Arrange
+        let infix_tests = vec![
+            ("5 + 5;", 5, "+", 5),
+            ("5 - 5;", 5, "-", 5),
+            ("5 * 5;", 5, "*", 5),
+            ("5 / 5;", 5, "/", 5),
+            ("5 > 5;", 5, ">", 5),
+            ("5 < 5;", 5, "<", 5),
+            ("5 == 5;", 5, "==", 5),
+            ("5 != 5;", 5, "!=", 5),
+        ];
+
+        // Act
+        for (input, left_value, op, right_value) in infix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.statements.len(), 1);
+            let expression_statement = match &program.statements[0] {
+                Statement::Expression {
+                    token: _,
+                    expression,
+                } => expression,
+                s => panic!("{s} is not an expression statement"),
+            };
+
+            match expression_statement {
+                Expression::Infix {
+                    left,
+                    operator,
+                    right,
+                } => {
+                    match &**right {
+                        Expression::IntegerLiteral(i) => assert_eq!(*i, right_value),
+                        e => panic!("{e} is not an integer literal"),
+                    }
+                    assert_eq!(operator, op);
+                    match &**left {
+                        Expression::IntegerLiteral(i) => assert_eq!(*i, left_value),
+                        e => panic!("{e} is not an integer literal"),
+                    }
+                }
+                e => panic!("{e} is not an infix expression"),
             };
         }
     }

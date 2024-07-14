@@ -11,6 +11,11 @@ pub enum Expression {
         operator: String,
         right: Box<Expression>,
     },
+    Infix {
+        left: Box<Expression>,
+        operator: String,
+        right: Box<Expression>,
+    },
 }
 
 impl Node for Expression {
@@ -20,6 +25,11 @@ impl Node for Expression {
             Expression::Identifier(value) => value.to_string(),
             Expression::IntegerLiteral(value) => value.to_string(),
             Expression::Prefix { operator, right } => format!("{operator}{right}"),
+            Expression::Infix {
+                left,
+                operator,
+                right,
+            } => format!("{left}{operator}{right}"),
         }
     }
 }
@@ -28,6 +38,11 @@ impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expression::Prefix { .. } => write!(f, "({})", self.token_literal()),
+            Expression::Infix {
+                left,
+                operator,
+                right,
+            } => write!(f, "({left} {operator} {right})"),
             _ => write!(f, "{}", self.token_literal()),
         }
     }
