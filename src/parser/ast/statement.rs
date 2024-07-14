@@ -34,13 +34,13 @@ impl Display for Statement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Statement::Let { name, value } => {
-                writeln!(f, "let {} = {};", name, value)
+                write!(f, "let {} = {};", name, value)
             }
-            Statement::Return(value) => writeln!(f, "return {value};"),
+            Statement::Return(value) => write!(f, "return {value};"),
             Statement::Expression {
                 token: _,
                 expression,
-            } => writeln!(f, "{expression}"),
+            } => write!(f, "{expression}"),
         }
     }
 }

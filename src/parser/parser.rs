@@ -5,11 +5,12 @@ use crate::token::{Kind, Token};
 use super::ast::{Program, Statement};
 
 const LOWEST: i32 = 0;
-const PREFIX: i32 = 1;
-const EQUALITY: i32 = 2;
-const LESS_GREATER: i32 = 3;
-const SUM: i32 = 4;
-const PRODUCT: i32 = 5;
+const EQUALITY: i32 = 1;
+const LESS_GREATER: i32 = 2;
+const SUM: i32 = 3;
+const PRODUCT: i32 = 4;
+const PREFIX: i32 = 5;
+const CALL: i32 = 6;
 
 struct Parser {
     lexer: Lexer,
@@ -146,25 +147,22 @@ impl Parser {
     fn parse_prefix(&mut self) -> Option<Expression> {
         let operator = self.current_token.literal.clone();
         self.next_token();
-        let expression = Expression::Prefix {
-            operator,
-            right: Box::new(self.parse_expression(PREFIX).unwrap()),
-        };
-
-        Some(expression)
+        let right = Box::new(self.parse_expression(PREFIX).unwrap());
+        Some(Expression::Prefix { operator, right })
     }
 
     fn parse_infix(&mut self, left: Expression) -> Option<Expression> {
+        let left = Box::new(left);
         let operator = self.current_token.literal.clone();
 
         let precedence = self.current_precedence();
         self.next_token();
-        let right = self.parse_expression(precedence);
+        let right = self.parse_expression(precedence).unwrap();
 
         let expression = Expression::Infix {
-            left: Box::new(left),
+            left,
             operator,
-            right: Box::new(right.unwrap()),
+            right: Box::new(right),
         };
 
         Some(expression)
@@ -435,6 +433,41 @@ mod tests {
                 }
                 e => panic!("{e} is not an infix expression"),
             };
+        }
+    }
+
+    #[test]
+    fn complex_infix_expressions() {
+        // Arrange
+        let infix_tests = vec![
+            ("-a * b", "((-a) * b)"),
+            ("!-a", "(!(-a))"),
+            ("a + b + c", "((a + b) + c)"),
+            ("a + b - c", "((a + b) - c)"),
+            ("a * b * c", "((a * b) * c)"),
+            ("a * b / c", "((a * b) / c)"),
+            ("a + b / c", "(a + (b / c))"),
+            ("a + b * c + d / e - f", "(((a + (b * c)) + (d / e)) - f)"),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)"),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))"),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+            ),
+        ];
+
+        // Act
+        for (input, expected) in infix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            println!("{:#?}", program.statements[0]);
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.to_string(), expected);
         }
     }
 }
