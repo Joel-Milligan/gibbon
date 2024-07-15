@@ -41,6 +41,7 @@ impl Parser {
         let mut left = match &self.current_token.kind {
             Kind::Ident => self.parse_identifier(),
             Kind::Int => self.parse_integer_literal(),
+            Kind::True | Kind::False => self.parse_boolean_literal(),
             Kind::Bang | Kind::Minus => self.parse_prefix(),
             _ => None,
         };
@@ -142,6 +143,12 @@ impl Parser {
             self.errors.push(err);
             return None;
         }
+    }
+
+    fn parse_boolean_literal(&mut self) -> Option<Expression> {
+        Some(Expression::BooleanLiteral(
+            self.current_token.kind == Kind::True,
+        ))
     }
 
     fn parse_prefix(&mut self) -> Option<Expression> {
@@ -320,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn literal_expression() {
+    fn integer_literal_expression() {
         // Arrange
         let input = "5;".to_string();
 
@@ -344,6 +351,36 @@ mod tests {
             Expression::IntegerLiteral(value) => {
                 assert_eq!(expression_statement.token_literal(), "5");
                 assert_eq!(*value, 5);
+            }
+            e => panic!("{e} is not an identifier"),
+        };
+    }
+
+    #[test]
+    fn boolean_literal_expression() {
+        // Arrange
+        let input = "true;".to_string();
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 1);
+        let expression_statement = match &program.statements[0] {
+            Statement::Expression {
+                token: _,
+                expression,
+            } => expression,
+            s => panic!("{s} is not an expression statement"),
+        };
+
+        match expression_statement {
+            Expression::BooleanLiteral(value) => {
+                assert_eq!(expression_statement.token_literal(), "true");
+                assert_eq!(*value, true);
             }
             e => panic!("{e} is not an identifier"),
         };
@@ -385,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn infix_expression() {
+    fn integer_infix_expression() {
         // Arrange
         let infix_tests = vec![
             ("5 + 5;", 5, "+", 5),
@@ -437,6 +474,52 @@ mod tests {
     }
 
     #[test]
+    fn boolean_infix_expression() {
+        // Arrange
+        let infix_tests = vec![
+            ("true == true;", true, "==", true),
+            ("true != false;", true, "!=", false),
+            ("false == false;", false, "==", false),
+        ];
+
+        // Act
+        for (input, left_value, op, right_value) in infix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.statements.len(), 1);
+            let expression_statement = match &program.statements[0] {
+                Statement::Expression {
+                    token: _,
+                    expression,
+                } => expression,
+                s => panic!("{s} is not an expression statement"),
+            };
+
+            match expression_statement {
+                Expression::Infix {
+                    left,
+                    operator,
+                    right,
+                } => {
+                    match &**right {
+                        Expression::BooleanLiteral(i) => assert_eq!(*i, right_value),
+                        e => panic!("{e} is not a boolean literal"),
+                    }
+                    assert_eq!(operator, op);
+                    match &**left {
+                        Expression::BooleanLiteral(i) => assert_eq!(*i, left_value),
+                        e => panic!("{e} is not a boolean literal"),
+                    }
+                }
+                e => panic!("{e} is not an infix expression"),
+            };
+        }
+    }
+    #[test]
     fn complex_infix_expressions() {
         // Arrange
         let infix_tests = vec![
@@ -459,6 +542,30 @@ mod tests {
 
         // Act
         for (input, expected) in infix_tests {
+            let lexer = Lexer::new(input.to_string());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            println!("{:#?}", program.statements[0]);
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn boolean_operator_precedence() {
+        // Arrange
+        let tests = vec![
+            ("true", "true"),
+            ("false", "false"),
+            ("3 > 5 == false", "((3 > 5) == false)"),
+            ("3 < 5 == true", "((3 < 5) == true)"),
+        ];
+
+        // Act
+        for (input, expected) in tests {
             let lexer = Lexer::new(input.to_string());
             let mut parser = Parser::new(lexer);
             let program = parser.parse_program();

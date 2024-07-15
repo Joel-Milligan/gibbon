@@ -7,6 +7,7 @@ pub enum Expression {
     Temporary,
     Identifier(String),
     IntegerLiteral(i64),
+    BooleanLiteral(bool),
     Prefix {
         operator: String,
         right: Box<Expression>,
@@ -24,6 +25,7 @@ impl Node for Expression {
             Expression::Temporary => "".to_string(),
             Expression::Identifier(value) => value.to_string(),
             Expression::IntegerLiteral(value) => value.to_string(),
+            Expression::BooleanLiteral(value) => value.to_string(),
             Expression::Prefix { operator, right } => format!("{operator}{right}"),
             Expression::Infix {
                 left,
