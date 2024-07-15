@@ -43,6 +43,7 @@ impl Parser {
             Kind::Int => self.parse_integer_literal(),
             Kind::True | Kind::False => self.parse_boolean_literal(),
             Kind::Bang | Kind::Minus => self.parse_prefix(),
+            Kind::LParen => self.parse_grouped_expression(),
             _ => None,
         };
 
@@ -173,6 +174,18 @@ impl Parser {
         };
 
         Some(expression)
+    }
+
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        let expression = self.parse_expression(LOWEST);
+
+        if !self.expect_peek(Kind::RParen) {
+            None
+        } else {
+            expression
+        }
     }
 
     fn peek_precedence(&self) -> i32 {
@@ -538,6 +551,11 @@ mod tests {
                 "3 + 4 * 5 == 3 * 1 + 4 * 5",
                 "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             ),
+            ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)"),
+            ("(5 + 5) * 2", "((5 + 5) * 2)"),
+            ("2 / (5 + 5)", "(2 / (5 + 5))"),
+            ("-(5 + 5)", "(-(5 + 5))"),
+            ("!(true == true)", "(!(true == true))"),
         ];
 
         // Act
