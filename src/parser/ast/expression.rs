@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::{BlockStatement, Node};
+use super::{BlockStatement, Identifer, Node};
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
@@ -22,6 +22,10 @@ pub enum Expression {
         consequence: Box<BlockStatement>,
         alternative: Option<Box<BlockStatement>>,
     },
+    FunctionLiteral {
+        parameters: Vec<Identifer>,
+        body: BlockStatement,
+    },
 }
 
 impl Node for Expression {
@@ -31,23 +35,14 @@ impl Node for Expression {
             Expression::Identifier(value) => value.to_string(),
             Expression::IntegerLiteral(value) => value.to_string(),
             Expression::BooleanLiteral(value) => value.to_string(),
-            Expression::Prefix { operator, right } => format!("{operator}{right}"),
+            Expression::Prefix { operator, right: _ } => operator.to_string(),
             Expression::Infix {
-                left,
+                left: _,
                 operator,
-                right,
-            } => format!("{left}{operator}{right}"),
-            Expression::If {
-                condition,
-                consequence,
-                alternative,
-            } => {
-                if let Some(alternative) = alternative {
-                    return format!("if{condition} {consequence}else {alternative}");
-                } else {
-                    return format!("if{condition} {consequence}");
-                }
-            }
+                right: _,
+            } => operator.to_string(),
+            Expression::If { .. } => "if".to_string(),
+            Expression::FunctionLiteral { .. } => "fn".to_string(),
         }
     }
 }
@@ -55,12 +50,32 @@ impl Node for Expression {
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Prefix { .. } => write!(f, "({})", self.token_literal()),
+            Expression::Prefix { operator, right } => write!(f, "({operator}{right})"),
             Expression::Infix {
                 left,
                 operator,
                 right,
             } => write!(f, "({left} {operator} {right})"),
+            Expression::If {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                if let Some(alternative) = alternative {
+                    return write!(f, "if{condition} {consequence}else {alternative}");
+                } else {
+                    return write!(f, "if{condition} {consequence}");
+                }
+            }
+            Expression::FunctionLiteral { parameters, body } => {
+                let parameters = parameters
+                    .iter()
+                    .map(|p| p.token_literal())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                write!(f, "fn({parameters}) {body}")
+            }
             _ => write!(f, "{}", self.token_literal()),
         }
     }

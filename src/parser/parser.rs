@@ -109,6 +109,7 @@ impl Parser {
             Kind::Bang | Kind::Minus => self.parse_prefix(),
             Kind::LParen => self.parse_grouped_expression(),
             Kind::If => self.parse_if_expression(),
+            Kind::Function => self.parse_function_literal(),
             _ => None,
         };
 
@@ -224,6 +225,25 @@ impl Parser {
         })
     }
 
+    fn parse_function_literal(&mut self) -> Option<Expression> {
+        if !self.expect_peek(Kind::LParen) {
+            return None;
+        }
+
+        let parameters = self.parse_function_parameters();
+
+        if !self.expect_peek(Kind::LBrace) {
+            return None;
+        }
+
+        let body = self.parse_block_statement();
+
+        Some(Expression::FunctionLiteral {
+            parameters: parameters.unwrap(),
+            body,
+        })
+    }
+
     fn parse_block_statement(&mut self) -> BlockStatement {
         let mut statements = vec![];
         self.next_token();
@@ -237,6 +257,39 @@ impl Parser {
         }
 
         BlockStatement { statements }
+    }
+
+    fn parse_function_parameters(&mut self) -> Option<Vec<Identifer>> {
+        let mut identifiers = vec![];
+
+        if self.peek_token.kind == Kind::RParen {
+            self.next_token();
+            return Some(identifiers);
+        }
+
+        self.next_token();
+
+        let identifier = Identifer {
+            token: self.current_token.clone(),
+            value: self.current_token.literal.clone(),
+        };
+        identifiers.push(identifier);
+
+        while self.peek_token.kind == Kind::Comma {
+            self.next_token();
+            self.next_token();
+            let identifier = Identifer {
+                token: self.current_token.clone(),
+                value: self.current_token.literal.clone(),
+            };
+            identifiers.push(identifier);
+        }
+
+        if !self.expect_peek(Kind::RParen) {
+            return None;
+        }
+
+        Some(identifiers)
     }
 
     fn peek_precedence(&self) -> i32 {
@@ -716,5 +769,86 @@ mod tests {
             }
             e => panic!("{e} is not an identifier"),
         };
+    }
+
+    #[test]
+    fn function_literal_expression() {
+        // Arrange
+        let input = "fn(x, y) { x + y; }".to_string();
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 1);
+        let expression_statement = match &program.statements[0] {
+            Statement::Expression {
+                token: _,
+                expression,
+            } => expression,
+            s => panic!("{s} is not an expression statement"),
+        };
+
+        match expression_statement {
+            Expression::FunctionLiteral { parameters, body } => {
+                assert_eq!(parameters[0].token_literal(), "x");
+                assert_eq!(parameters[1].token_literal(), "y");
+                assert_eq!(body.statements.len(), 1);
+                match &body.statements[0] {
+                    Statement::Expression {
+                        token: _,
+                        expression,
+                    } => {
+                        assert_eq!(expression.to_string(), "(x + y)")
+                    }
+                    s => panic!("{s} is not an expression statement"),
+                }
+            }
+            e => panic!("{e} is not a function literal"),
+        };
+    }
+
+    #[test]
+    fn function_parameters() {
+        // Arrange
+        let tests = vec![
+            ("fn() {};".to_string(), vec![]),
+            ("fn(x) {};".to_string(), vec!["x"]),
+            ("fn(x, y, z) {};".to_string(), vec!["x", "y", "z"]),
+        ];
+
+        for (input, expected) in tests {
+            // Act
+            let lexer = Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            // Assert
+            check_parser_errors(&parser);
+            assert_eq!(program.statements.len(), 1);
+            let expression_statement = match &program.statements[0] {
+                Statement::Expression {
+                    token: _,
+                    expression,
+                } => expression,
+                s => panic!("{s} is not an expression statement"),
+            };
+
+            match expression_statement {
+                Expression::FunctionLiteral {
+                    parameters,
+                    body: _,
+                } => {
+                    assert_eq!(parameters.len(), expected.len());
+                    for (i, parameter) in parameters.iter().enumerate() {
+                        assert_eq!(parameter.token_literal(), expected[i]);
+                    }
+                }
+                e => panic!("{e} is not a function literal"),
+            };
+        }
     }
 }
