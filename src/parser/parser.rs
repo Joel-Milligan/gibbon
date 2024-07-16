@@ -1,8 +1,7 @@
 use crate::lexer::Lexer;
-use crate::parser::ast::{Expression, Identifer};
 use crate::token::{Kind, Token};
 
-use super::ast::{Program, Statement};
+use super::ast::{Expression, Identifer, Program, Statement};
 
 const LOWEST: i32 = 0;
 const EQUALITY: i32 = 1;
@@ -37,34 +36,18 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
-        let mut left = match &self.current_token.kind {
-            Kind::Ident => self.parse_identifier(),
-            Kind::Int => self.parse_integer_literal(),
-            Kind::True | Kind::False => self.parse_boolean_literal(),
-            Kind::Bang | Kind::Minus => self.parse_prefix(),
-            Kind::LParen => self.parse_grouped_expression(),
-            _ => None,
-        };
+    fn parse_program(&mut self) -> Program {
+        let mut program = Program { statements: vec![] };
 
-        while self.peek_token.kind != Kind::SemiColon && precendence < self.peek_precedence() {
-            left = match &self.peek_token.kind {
-                Kind::Plus
-                | Kind::Minus
-                | Kind::Asterix
-                | Kind::Slash
-                | Kind::Eq
-                | Kind::Ne
-                | Kind::Gt
-                | Kind::Lt => {
-                    self.next_token();
-                    self.parse_infix(left.unwrap())
-                }
-                _ => return left,
+        while self.current_token.kind != Kind::Eof {
+            let statement = self.parse_statement();
+            if let Some(s) = statement {
+                program.statements.push(s);
             }
+            self.next_token();
         }
 
-        left
+        program
     }
 
     fn parse_statement(&mut self) -> Option<Statement> {
@@ -118,18 +101,34 @@ impl Parser {
         }
     }
 
-    fn parse_program(&mut self) -> Program {
-        let mut program = Program { statements: vec![] };
+    fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
+        let mut left = match &self.current_token.kind {
+            Kind::Ident => self.parse_identifier(),
+            Kind::Int => self.parse_integer_literal(),
+            Kind::True | Kind::False => self.parse_boolean_literal(),
+            Kind::Bang | Kind::Minus => self.parse_prefix(),
+            Kind::LParen => self.parse_grouped_expression(),
+            _ => None,
+        };
 
-        while self.current_token.kind != Kind::Eof {
-            let statement = self.parse_statement();
-            if let Some(s) = statement {
-                program.statements.push(s);
+        while self.peek_token.kind != Kind::SemiColon && precendence < self.peek_precedence() {
+            left = match &self.peek_token.kind {
+                Kind::Plus
+                | Kind::Minus
+                | Kind::Asterix
+                | Kind::Slash
+                | Kind::Eq
+                | Kind::Ne
+                | Kind::Gt
+                | Kind::Lt => {
+                    self.next_token();
+                    self.parse_infix(left.unwrap())
+                }
+                _ => return left,
             }
-            self.next_token();
         }
 
-        program
+        left
     }
 
     fn parse_identifier(&self) -> Option<Expression> {
@@ -159,6 +158,18 @@ impl Parser {
         Some(Expression::Prefix { operator, right })
     }
 
+    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+        self.next_token();
+
+        let expression = self.parse_expression(LOWEST);
+
+        if !self.expect_peek(Kind::RParen) {
+            None
+        } else {
+            expression
+        }
+    }
+
     fn parse_infix(&mut self, left: Expression) -> Option<Expression> {
         let left = Box::new(left);
         let operator = self.current_token.literal.clone();
@@ -174,18 +185,6 @@ impl Parser {
         };
 
         Some(expression)
-    }
-
-    fn parse_grouped_expression(&mut self) -> Option<Expression> {
-        self.next_token();
-
-        let expression = self.parse_expression(LOWEST);
-
-        if !self.expect_peek(Kind::RParen) {
-            None
-        } else {
-            expression
-        }
     }
 
     fn peek_precedence(&self) -> i32 {
