@@ -4,7 +4,7 @@ use crate::token::Token;
 
 use super::{Expression, Identifer, Node};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Statement {
     Let {
         name: Identifer,
@@ -42,5 +42,26 @@ impl Display for Statement {
                 expression,
             } => write!(f, "{expression}"),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BlockStatement {
+    pub statements: Vec<Statement>,
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> String {
+        "{".to_string()
+    }
+}
+
+impl Display for BlockStatement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.statements {
+            write!(f, "{}", statement)?;
+        }
+
+        Ok(())
     }
 }

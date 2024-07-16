@@ -4,7 +4,7 @@ use crate::token::Token;
 
 use super::Node;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Identifer {
     pub token: Token,
     pub value: String,

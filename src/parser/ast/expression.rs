@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use super::Node;
+use super::{BlockStatement, Node};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expression {
     Temporary,
     Identifier(String),
@@ -16,6 +16,11 @@ pub enum Expression {
         left: Box<Expression>,
         operator: String,
         right: Box<Expression>,
+    },
+    If {
+        condition: Box<Expression>,
+        consequence: Box<BlockStatement>,
+        alternative: Option<Box<BlockStatement>>,
     },
 }
 
@@ -32,6 +37,17 @@ impl Node for Expression {
                 operator,
                 right,
             } => format!("{left}{operator}{right}"),
+            Expression::If {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                if let Some(alternative) = alternative {
+                    return format!("if{condition} {consequence}else {alternative}");
+                } else {
+                    return format!("if{condition} {consequence}");
+                }
+            }
         }
     }
 }
