@@ -66,21 +66,26 @@ impl Parser {
                     return None;
                 }
 
-                while self.current_token.kind != Kind::SemiColon {
+                self.next_token();
+
+                let value = self.parse_expression(LOWEST).unwrap();
+
+                if self.peek_token.kind == Kind::SemiColon {
                     self.next_token();
                 }
 
-                Some(Statement::Let {
-                    name,
-                    value: Expression::Temporary,
-                })
+                Some(Statement::Let { name, value })
             }
             Kind::Return => {
-                while self.current_token.kind != Kind::SemiColon {
+                self.next_token();
+
+                let value = self.parse_expression(LOWEST).unwrap();
+
+                if self.peek_token.kind == Kind::SemiColon {
                     self.next_token();
                 }
 
-                Some(Statement::Return(Expression::Temporary))
+                Some(Statement::Return(value))
             }
             _ => {
                 if let Some(expression) = self.parse_expression(LOWEST) {
@@ -401,14 +406,7 @@ mod tests {
     #[test]
     fn let_statement() {
         // Arrange
-        let input = r#"
-            let x = 5; 
-            let y = 10; 
-            let foobar = 838383;
-        "#
-        .to_string();
-
-        let tests = vec!["x", "y", "foobar"];
+        let input = "let x = 5;".to_string();
 
         // Act
         let lexer = Lexer::new(input);
@@ -417,24 +415,25 @@ mod tests {
 
         // Assert
         check_parser_errors(&parser);
-        assert_eq!(program.statements.len(), 3);
-        for (i, t) in tests.iter().enumerate() {
-            let statement = &program.statements[i];
-            assert!(valid_let_statement(statement, t));
-        }
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Let { name, value } => {
+                assert_eq!(name.token_literal(), "x".to_string());
+                match value {
+                    Expression::IntegerLiteral(value) => {
+                        assert_eq!(*value, 5);
+                    }
+                    e => panic!("{e} is not an integer"),
+                };
+            }
+            s => panic!("{s} is not a let statement"),
+        };
     }
 
     #[test]
     fn return_statement() {
         // Arrange
-        let input = r#"
-            return 5; 
-            return 10; 
-            return 838383;
-        "#
-        .to_string();
-
-        let tests = vec!["x", "y", "foobar"];
+        let input = "return 5;".to_string();
 
         // Act
         let lexer = Lexer::new(input);
@@ -443,11 +442,18 @@ mod tests {
 
         // Assert
         check_parser_errors(&parser);
-        assert_eq!(program.statements.len(), 3);
-        for i in 0..tests.len() {
-            let statement = &program.statements[i];
-            assert_eq!(statement.token_literal(), "return");
-        }
+        assert_eq!(program.statements.len(), 1);
+        match &program.statements[0] {
+            Statement::Return(value) => {
+                match value {
+                    Expression::IntegerLiteral(value) => {
+                        assert_eq!(*value, 5);
+                    }
+                    e => panic!("{e} is not an integer"),
+                };
+            }
+            s => panic!("{s} is not a return statement"),
+        };
     }
 
     #[test]

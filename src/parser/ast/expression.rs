@@ -4,7 +4,6 @@ use super::{BlockStatement, Identifer, Node};
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
-    Temporary,
     Identifier(String),
     IntegerLiteral(i64),
     BooleanLiteral(bool),
@@ -35,7 +34,6 @@ pub enum Expression {
 impl Node for Expression {
     fn token_literal(&self) -> String {
         match self {
-            Expression::Temporary => "".to_string(),
             Expression::Identifier(value) => value.to_string(),
             Expression::IntegerLiteral(value) => value.to_string(),
             Expression::BooleanLiteral(value) => value.to_string(),
