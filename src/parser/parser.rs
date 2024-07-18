@@ -126,6 +126,10 @@ impl Parser {
                     self.next_token();
                     self.parse_infix(left.unwrap())
                 }
+                Kind::LParen => {
+                    self.next_token();
+                    self.parse_call_expression(left.unwrap())
+                }
                 _ => return left,
             }
         }
@@ -292,12 +296,44 @@ impl Parser {
         Some(identifiers)
     }
 
+    fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
+        Some(Expression::Call {
+            function: Box::new(function),
+            arguments: Box::new(self.parse_call_arguments().unwrap()),
+        })
+    }
+
+    fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
+        let mut args = vec![];
+
+        if self.peek_token.kind == Kind::RParen {
+            self.next_token();
+            return Some(args);
+        }
+
+        self.next_token();
+        args.push(self.parse_expression(LOWEST).unwrap());
+
+        while self.peek_token.kind == Kind::Comma {
+            self.next_token();
+            self.next_token();
+            args.push(self.parse_expression(LOWEST).unwrap());
+        }
+
+        if !self.expect_peek(Kind::RParen) {
+            return None;
+        }
+
+        return Some(args);
+    }
+
     fn peek_precedence(&self) -> i32 {
         match self.peek_token.kind {
             Kind::Eq | Kind::Ne => EQUALITY,
             Kind::Lt | Kind::Gt => LESS_GREATER,
             Kind::Plus | Kind::Minus => SUM,
             Kind::Asterix | Kind::Slash => PRODUCT,
+            Kind::LParen => CALL,
             _ => LOWEST,
         }
     }
@@ -308,6 +344,7 @@ impl Parser {
             Kind::Lt | Kind::Gt => LESS_GREATER,
             Kind::Plus | Kind::Minus => SUM,
             Kind::Asterix | Kind::Slash => PRODUCT,
+            Kind::LParen => CALL,
             _ => LOWEST,
         }
     }
@@ -661,6 +698,15 @@ mod tests {
             ("2 / (5 + 5)", "(2 / (5 + 5))"),
             ("-(5 + 5)", "(-(5 + 5))"),
             ("!(true == true)", "(!(true == true))"),
+            ("a + add(b * c) + d", "((a + add((b * c))) + d)"),
+            (
+                "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+                "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            ),
+            (
+                "add(a + b + c * d / f + g)",
+                "add((((a + b) + ((c * d) / f)) + g))",
+            ),
         ];
 
         // Act
@@ -850,5 +896,46 @@ mod tests {
                 e => panic!("{e} is not a function literal"),
             };
         }
+    }
+
+    #[test]
+    fn call_expression() {
+        // Arrange
+        let input = "add(1, 2 * 3, 4 + 5);".to_string();
+
+        // Act
+        let lexer = Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        // Assert
+        check_parser_errors(&parser);
+        assert_eq!(program.statements.len(), 1);
+        let expression_statement = match &program.statements[0] {
+            Statement::Expression {
+                token: _,
+                expression,
+            } => expression,
+            s => panic!("{s} is not an expression statement"),
+        };
+
+        match expression_statement {
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                match &**function {
+                    Expression::Identifier(value) => {
+                        assert_eq!(*value, "add".to_string());
+                    }
+                    e => panic!("{e} is not an identifier"),
+                }
+                assert_eq!(arguments.len(), 3);
+                assert_eq!(arguments[0].to_string(), "1".to_string());
+                assert_eq!(arguments[1].to_string(), "(2 * 3)".to_string());
+                assert_eq!(arguments[2].to_string(), "(4 + 5)".to_string());
+            }
+            e => panic!("{e} is not a function call"),
+        };
     }
 }

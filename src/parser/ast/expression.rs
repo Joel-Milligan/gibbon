@@ -26,6 +26,10 @@ pub enum Expression {
         parameters: Vec<Identifer>,
         body: BlockStatement,
     },
+    Call {
+        function: Box<Expression>,
+        arguments: Box<Vec<Expression>>,
+    },
 }
 
 impl Node for Expression {
@@ -43,6 +47,7 @@ impl Node for Expression {
             } => operator.to_string(),
             Expression::If { .. } => "if".to_string(),
             Expression::FunctionLiteral { .. } => "fn".to_string(),
+            Expression::Call { .. } => "(".to_string(),
         }
     }
 }
@@ -75,6 +80,18 @@ impl Display for Expression {
                     .join(", ");
 
                 write!(f, "fn({parameters}) {body}")
+            }
+            Expression::Call {
+                function,
+                arguments,
+            } => {
+                let arguments = arguments
+                    .iter()
+                    .map(|p| p.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                write!(f, "{function}({arguments})")
             }
             _ => write!(f, "{}", self.token_literal()),
         }
