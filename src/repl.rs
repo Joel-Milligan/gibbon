@@ -1,9 +1,9 @@
 use std::io::{self, Stdin, Write};
 
 use crate::lexer::Lexer;
-use crate::parser::parser::Parser;
+use crate::parser::Parser;
 
-static PROMPT: &'static str = ">> ";
+static PROMPT: &str = ">> ";
 
 pub fn start(stdin: &mut Stdin) {
     let mut input_buffer = String::new();
@@ -22,7 +22,7 @@ pub fn start(stdin: &mut Stdin) {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        if parser.errors.len() != 0 {
+        if !parser.errors.is_empty() {
             print_parser_errors(parser.errors);
             continue;
         }

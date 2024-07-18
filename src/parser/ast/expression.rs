@@ -27,7 +27,7 @@ pub enum Expression {
     },
     Call {
         function: Box<Expression>,
-        arguments: Box<Vec<Expression>>,
+        arguments: Vec<Expression>,
     },
 }
 
@@ -65,9 +65,9 @@ impl Display for Expression {
                 alternative,
             } => {
                 if let Some(alternative) = alternative {
-                    return write!(f, "if{condition} {consequence}else {alternative}");
+                    write!(f, "if{condition} {consequence}else {alternative}")
                 } else {
-                    return write!(f, "if{condition} {consequence}");
+                    write!(f, "if{condition} {consequence}")
                 }
             }
             Expression::FunctionLiteral { parameters, body } => {
