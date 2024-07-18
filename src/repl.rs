@@ -1,11 +1,11 @@
-use std::io::{self, Stdin, Stdout, Write};
+use std::io::{self, Stdin, Write};
 
 use crate::lexer::Lexer;
-use crate::token::Kind;
+use crate::parser::parser::Parser;
 
 static PROMPT: &'static str = ">> ";
 
-pub fn start(stdin: &mut Stdin, stdout: &mut Stdout) {
+pub fn start(stdin: &mut Stdin) {
     let mut input_buffer = String::new();
 
     loop {
@@ -17,12 +17,22 @@ pub fn start(stdin: &mut Stdin, stdout: &mut Stdout) {
             .read_line(&mut input_buffer)
             .expect("Could not read from stdin");
 
-        let mut lexer = Lexer::new(input_buffer.clone());
-        let mut token = lexer.next_token();
+        let line = input_buffer.clone();
+        let lexer = Lexer::new(line);
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
 
-        while token.kind != Kind::Eof {
-            writeln!(stdout, "{token:?}").expect("Could not write to stdout");
-            token = lexer.next_token();
+        if parser.errors.len() != 0 {
+            print_parser_errors(parser.errors);
+            continue;
         }
+
+        println!("{program}");
+    }
+}
+
+pub fn print_parser_errors(errors: Vec<String>) {
+    for error in errors {
+        println!("\t{error}");
     }
 }

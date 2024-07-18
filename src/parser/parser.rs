@@ -11,15 +11,15 @@ const PRODUCT: i32 = 4;
 const PREFIX: i32 = 5;
 const CALL: i32 = 6;
 
-struct Parser {
+pub struct Parser {
     lexer: Lexer,
-    errors: Vec<String>,
+    pub errors: Vec<String>,
     current_token: Token,
     peek_token: Token,
 }
 
 impl Parser {
-    fn new(mut lexer: Lexer) -> Self {
+    pub fn new(mut lexer: Lexer) -> Self {
         let current_token = lexer.next_token();
         let peek_token = lexer.next_token();
 
@@ -36,7 +36,7 @@ impl Parser {
         self.peek_token = self.lexer.next_token();
     }
 
-    fn parse_program(&mut self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program { statements: vec![] };
 
         while self.current_token.kind != Kind::Eof {
@@ -378,19 +378,6 @@ mod tests {
     use crate::parser::ast::{Expression, Node, Statement};
 
     use super::Parser;
-
-    fn valid_let_statement(statement: &Statement, let_name: &str) -> bool {
-        if statement.token_literal() != "let" {
-            return false;
-        }
-
-        match statement {
-            Statement::Let { name, .. } => {
-                name.value == let_name && name.token_literal() == let_name
-            }
-            _ => false,
-        }
-    }
 
     fn check_parser_errors(parser: &Parser) {
         if parser.errors.len() != 0 {

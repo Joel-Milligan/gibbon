@@ -7,7 +7,6 @@ fn main() {
     println!("Begin typing commands.");
 
     let mut stdin = io::stdin();
-    let mut stdout = io::stdout();
 
-    repl::start(&mut stdin, &mut stdout);
+    repl::start(&mut stdin);
 }
