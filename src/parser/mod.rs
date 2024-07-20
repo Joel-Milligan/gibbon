@@ -42,21 +42,18 @@ impl Parser {
         let mut program = Program { statements: vec![] };
 
         while self.current_token.kind != Kind::Eof {
-            let statement = self.parse_statement();
-            if let Some(s) = statement {
-                program.statements.push(s);
-            }
+            program.statements.push(self.parse_statement());
             self.next_token();
         }
 
         program
     }
 
-    fn parse_statement(&mut self) -> Option<Statement> {
+    fn parse_statement(&mut self) -> Statement {
         match &self.current_token.kind {
             Kind::Let => {
                 if !self.expect_peek(Kind::Ident) {
-                    return None;
+                    panic!("let must be follow by an identifier")
                 }
 
                 let name = Identifer {
@@ -65,50 +62,46 @@ impl Parser {
                 };
 
                 if !self.expect_peek(Kind::Assign) {
-                    return None;
+                    panic!("let identifier must be follow by an assign token")
                 }
 
                 self.next_token();
 
-                let value = self.parse_expression(LOWEST).unwrap();
+                let value = self.parse_expression(LOWEST);
 
                 if self.peek_token.kind == Kind::SemiColon {
                     self.next_token();
                 }
 
-                Some(Statement::Let { name, value })
+                Statement::Let { name, value }
             }
             Kind::Return => {
                 self.next_token();
 
-                let value = self.parse_expression(LOWEST).unwrap();
+                let value = self.parse_expression(LOWEST);
 
                 if self.peek_token.kind == Kind::SemiColon {
                     self.next_token();
                 }
 
-                Some(Statement::Return(value))
+                Statement::Return(value)
             }
             _ => {
-                if let Some(expression) = self.parse_expression(LOWEST) {
-                    let statement = Statement::Expression {
-                        token: self.current_token.clone(),
-                        expression,
-                    };
+                let statement = Statement::Expression {
+                    token: self.current_token.clone(),
+                    expression: self.parse_expression(LOWEST),
+                };
 
-                    if self.peek_token.kind == Kind::SemiColon {
-                        self.next_token();
-                    }
-
-                    Some(statement)
-                } else {
-                    None
+                if self.peek_token.kind == Kind::SemiColon {
+                    self.next_token();
                 }
+
+                statement
             }
         }
     }
 
-    fn parse_expression(&mut self, precendence: i32) -> Option<Expression> {
+    fn parse_expression(&mut self, precendence: i32) -> Expression {
         let mut left = match &self.current_token.kind {
             Kind::Ident => self.parse_identifier(),
             Kind::Int => self.parse_integer_literal(),
@@ -117,7 +110,7 @@ impl Parser {
             Kind::LParen => self.parse_grouped_expression(),
             Kind::If => self.parse_if_expression(),
             Kind::Function => self.parse_function_literal(),
-            _ => None,
+            token => panic!("can't parse expression that starts with {token:?}"),
         };
 
         while self.peek_token.kind != Kind::SemiColon && precendence < self.peek_precedence() {
@@ -131,11 +124,11 @@ impl Parser {
                 | Kind::Gt
                 | Kind::Lt => {
                     self.next_token();
-                    self.parse_infix(left.unwrap())
+                    self.parse_infix(left)
                 }
                 Kind::LParen => {
                     self.next_token();
-                    self.parse_call_expression(left.unwrap())
+                    self.parse_call_expression(left)
                 }
                 _ => return left,
             }
@@ -144,72 +137,67 @@ impl Parser {
         left
     }
 
-    fn parse_identifier(&self) -> Option<Expression> {
-        Some(Expression::Identifier(self.current_token.literal.clone()))
+    fn parse_identifier(&self) -> Expression {
+        Expression::Identifier(self.current_token.literal.clone())
     }
 
-    fn parse_integer_literal(&mut self) -> Option<Expression> {
-        if let Ok(value) = self.current_token.literal.parse::<i64>() {
-            Some(Expression::IntegerLiteral(value))
-        } else {
-            let err = format!("could not parse {} as integer", self.current_token.literal);
-            self.errors.push(err);
-            None
-        }
+    fn parse_integer_literal(&mut self) -> Expression {
+        Expression::IntegerLiteral(
+            self.current_token
+                .literal
+                .parse::<i64>()
+                .expect("could not parse integer literal"),
+        )
     }
 
-    fn parse_boolean_literal(&mut self) -> Option<Expression> {
-        Some(Expression::BooleanLiteral(
-            self.current_token.kind == Kind::True,
-        ))
+    fn parse_boolean_literal(&mut self) -> Expression {
+        Expression::BooleanLiteral(self.current_token.kind == Kind::True)
     }
 
-    fn parse_prefix(&mut self) -> Option<Expression> {
+    fn parse_prefix(&mut self) -> Expression {
         let operator = self.current_token.literal.clone();
         self.next_token();
-        let right = Box::new(self.parse_expression(PREFIX).unwrap());
-        Some(Expression::Prefix { operator, right })
+        let right = Box::new(self.parse_expression(PREFIX));
+        Expression::Prefix { operator, right }
     }
 
-    fn parse_infix(&mut self, left: Expression) -> Option<Expression> {
+    fn parse_infix(&mut self, left: Expression) -> Expression {
         let left = Box::new(left);
         let operator = self.current_token.literal.clone();
 
         let precedence = self.current_precedence();
         self.next_token();
-        let right = self.parse_expression(precedence).unwrap();
+        let right = Box::new(self.parse_expression(precedence));
 
-        let expression = Expression::Infix {
+        Expression::Infix {
             left,
             operator,
-            right: Box::new(right),
-        };
-
-        Some(expression)
+            right,
+        }
     }
 
-    fn parse_grouped_expression(&mut self) -> Option<Expression> {
+    fn parse_grouped_expression(&mut self) -> Expression {
         self.next_token();
 
         let expression = self.parse_expression(LOWEST);
 
         if !self.expect_peek(Kind::RParen) {
-            None
+            panic!("expected right paren")
         } else {
             expression
         }
     }
 
-    fn parse_if_expression(&mut self) -> Option<Expression> {
+    fn parse_if_expression(&mut self) -> Expression {
         if !self.expect_peek(Kind::LParen) {
-            return None;
+            panic!("expected left paren")
         }
 
         self.next_token();
-        let condition = self.parse_expression(LOWEST).unwrap();
+        let condition = self.parse_expression(LOWEST);
 
         if !self.expect_peek(Kind::RParen) || !self.expect_peek(Kind::LBrace) {
-            return None;
+            panic!("expected right paren or left brace")
         }
 
         let consequence = self.parse_block_statement();
@@ -218,41 +206,41 @@ impl Parser {
             self.next_token();
 
             if !self.expect_peek(Kind::LBrace) {
-                return None;
+                panic!("expected left brace")
             }
 
             let alternative = self.parse_block_statement();
-            return Some(Expression::If {
+            return Expression::If {
                 condition: Box::new(condition),
                 consequence: Box::new(consequence),
                 alternative: Some(Box::new(alternative)),
-            });
+            };
         }
 
-        Some(Expression::If {
+        Expression::If {
             condition: Box::new(condition),
             consequence: Box::new(consequence),
             alternative: None,
-        })
+        }
     }
 
-    fn parse_function_literal(&mut self) -> Option<Expression> {
+    fn parse_function_literal(&mut self) -> Expression {
         if !self.expect_peek(Kind::LParen) {
-            return None;
+            panic!("Expected left paren")
         }
 
         let parameters = self.parse_function_parameters();
 
         if !self.expect_peek(Kind::LBrace) {
-            return None;
+            panic!("Expected left brace")
         }
 
         let body = self.parse_block_statement();
 
-        Some(Expression::FunctionLiteral {
+        Expression::FunctionLiteral {
             parameters: parameters.unwrap(),
             body,
-        })
+        }
     }
 
     fn parse_block_statement(&mut self) -> BlockStatement {
@@ -261,9 +249,7 @@ impl Parser {
 
         while self.current_token.kind != Kind::RBrace && self.current_token.kind != Kind::Eof {
             let statement = self.parse_statement();
-            if let Some(statement) = statement {
-                statements.push(statement);
-            }
+            statements.push(statement);
             self.next_token();
         }
 
@@ -303,11 +289,11 @@ impl Parser {
         Some(identifiers)
     }
 
-    fn parse_call_expression(&mut self, function: Expression) -> Option<Expression> {
-        Some(Expression::Call {
+    fn parse_call_expression(&mut self, function: Expression) -> Expression {
+        Expression::Call {
             function: Box::new(function),
             arguments: self.parse_call_arguments().unwrap(),
-        })
+        }
     }
 
     fn parse_call_arguments(&mut self) -> Option<Vec<Expression>> {
@@ -319,12 +305,12 @@ impl Parser {
         }
 
         self.next_token();
-        args.push(self.parse_expression(LOWEST).unwrap());
+        args.push(self.parse_expression(LOWEST));
 
         while self.peek_token.kind == Kind::Comma {
             self.next_token();
             self.next_token();
-            args.push(self.parse_expression(LOWEST).unwrap());
+            args.push(self.parse_expression(LOWEST));
         }
 
         if !self.expect_peek(Kind::RParen) {
